@@ -4,14 +4,22 @@ from streamlit_folium import folium_static
 import streamlit as st
 from geopy.geocoders import Nominatim
 
-# Load Excel sheet
-df = pd.read_excel("For Visual Representation.xls - Sheet1.pdf")
+st.set_page_config(layout="wide")
 
-# Clean and preview data
-st.write("Original Data", df.head())
+# Upload data
+st.title("Toronto Dialysis Patient Map")
 
-# Convert postal codes to latitude and longitude
-geolocator = Nominatim(user_agent="toronto_map")
+# Load Excel data (you may need to convert it to .xlsx if it's PDF)
+try:
+    df = pd.read_excel("For Visual Representation.xls - Sheet1.pdf")
+except Exception as e:
+    st.error("Couldn't read the file. Try saving it as .xlsx in Excel or Google Sheets.")
+    st.stop()
+
+st.write("Raw Data Preview:", df.head())
+
+# Geocode Postal Codes
+geolocator = Nominatim(user_agent="geoapi")
 
 def get_lat_lon(postal_code):
     try:
@@ -21,33 +29,24 @@ def get_lat_lon(postal_code):
     except:
         return pd.Series([None, None])
 
-# Only run geocoding if lat/lon not already there
 if 'Latitude' not in df.columns or 'Longitude' not in df.columns:
     df[['Latitude', 'Longitude']] = df['Postal Code'].apply(get_lat_lon)
+    df = df.dropna(subset=["Latitude", "Longitude"])
     df.to_csv("processed_patients.csv", index=False)
 else:
     df = pd.read_csv("processed_patients.csv")
 
-# Base Map Centered on Toronto
-center = [43.6532, -79.3832]
-m = folium.Map(location=center, zoom_start=11)
+# Show Map
+m = folium.Map(location=[43.6532, -79.3832], zoom_start=11)
 
-# Add data points
 for _, row in df.iterrows():
-    if pd.notnull(row['Latitude']) and pd.notnull(row['Longitude']):
-        folium.CircleMarker(
-            location=[row['Latitude'], row['Longitude']],
-            radius=5,
-            popup=f"{row['Sex']}, {row['Postal Code']}",
-            color='blue',
-            fill=True
-        ).add_to(m)
+    folium.CircleMarker(
+        location=[row['Latitude'], row['Longitude']],
+        radius=5,
+        popup=f"{row['Sex']}, {row['Postal Code']}",
+        color='blue',
+        fill=True
+    ).add_to(m)
 
-# Display the map in Streamlit
-st.title("Toronto Dialysis Patient Map")
 folium_static(m)
-
-
-pip install pandas streamlit folium geopy streamlit-folium
-streamlit run app.py
 
